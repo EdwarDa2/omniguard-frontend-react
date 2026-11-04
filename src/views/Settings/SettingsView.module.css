@@ -1,0 +1,38 @@
+.settingsView {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.tabNavigation {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 1px solid #1c263c;
+  padding-bottom: 0.5rem;
+}
+
+.tabButton {
+  padding: 0.5rem 1rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  border-radius: 0.375rem;
+  color: #94a3b8;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tabButtonActive {
+  background-color: #172033;
+  color: #38bdf8;
+}
+
+.settingsCard {
+  background-color: #0d1322;
+  border: 1px solid #1c263c;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+

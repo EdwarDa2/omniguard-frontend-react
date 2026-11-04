@@ -1,0 +1,27 @@
+.alertsView {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.severityGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.tableSection {
+  background-color: #0d1322;
+  border: 1px solid #1c263c;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
+.detailSection {
+  background-color: #0d1322;
+  border: 1px solid #1c263c;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+

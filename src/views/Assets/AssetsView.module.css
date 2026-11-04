@@ -1,0 +1,34 @@
+.assetsView {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.kpiBar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+
+.splitLayout {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 1.25rem;
+  min-height: 520px;
+}
+
+.inventoryCol {
+  background-color: #0d1322;
+  border: 1px solid #1c263c;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
+.detailCol {
+  background-color: #0d1322;
+  border: 1px solid #1c263c;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
+}
+
