@@ -57,7 +57,7 @@ export const NotificationsTab: React.FC = () => {
       await settingsService.testChannel('discord')
       setDiscordTestMsg('✓ Alerta de prueba entregada en canal de Discord')
     } catch {
-      setDiscordTestMsg('Alerta de prueba despachada hacia el worker de Python.')
+      setDiscordTestMsg('No se pudo entregar la alerta de prueba en Discord.')
     } finally {
       setIsTestingDiscord(false)
       setTimeout(() => setDiscordTestMsg(''), 4500)

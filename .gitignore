@@ -27,5 +27,9 @@ dist-ssr
 agente/
 contexto/
 
+# Playwright temporary reports
+test-results/
+playwright-report/
+
 .env
 *.env

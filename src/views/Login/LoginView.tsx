@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/store/useAuthStore'
-import { Shield, Lock, User, AlertCircle, ArrowRight, KeyRound } from 'lucide-react'
+import { Shield, Lock, User, AlertCircle, ArrowRight } from 'lucide-react'
 
 export const LoginView: React.FC = () => {
   const navigate = useNavigate()
@@ -27,12 +27,6 @@ export const LoginView: React.FC = () => {
     } finally {
       setIsSubmitting(false)
     }
-  }
-
-  const fillTestCredentials = () => {
-    clearError()
-    setUsername('admin')
-    setPassword('OmniGuardAdmin2026!')
   }
 
   return (
@@ -136,18 +130,6 @@ export const LoginView: React.FC = () => {
             </button>
           </form>
 
-          {/* Botón de ayuda para rellenar credenciales en pruebas */}
-          <div className="mt-6 pt-5 border-t border-[#1c2438] flex items-center justify-between text-xs text-slate-400">
-            <span className="text-[11px] text-slate-500">¿Entorno de desarrollo?</span>
-            <button
-              type="button"
-              onClick={fillTestCredentials}
-              className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 hover:text-emerald-300 font-mono transition-colors cursor-pointer"
-            >
-              <KeyRound className="w-3.5 h-3.5" />
-              <span>Usar cuenta Admin</span>
-            </button>
-          </div>
         </div>
 
         {/* Footer legal */}
