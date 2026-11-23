@@ -1,50 +1,54 @@
 import React from 'react'
 
-interface CounterItem {
-  label: string
-  count: string
-  sublabel: string
-  textColor: string
-  borderColor: string
-  badgeBg: string
+interface SeverityCountersProps {
+  counts?: {
+    critical: number
+    high: number
+    medium: number
+    low: number
+  }
 }
 
-const counters: CounterItem[] = [
-  {
-    label: 'Críticas',
-    count: '03',
-    sublabel: 'ÚLTIMAS 24 H',
-    textColor: 'text-rose-500',
-    borderColor: 'border-rose-900/30',
-    badgeBg: 'bg-rose-950/40 text-rose-400',
-  },
-  {
-    label: 'Altas',
-    count: '07',
-    sublabel: 'ÚLTIMAS 24 H',
-    textColor: 'text-orange-500',
-    borderColor: 'border-orange-900/30',
-    badgeBg: 'bg-orange-950/40 text-orange-400',
-  },
-  {
-    label: 'Medias',
-    count: '09',
-    sublabel: 'ÚLTIMAS 24 H',
-    textColor: 'text-amber-400',
-    borderColor: 'border-amber-900/30',
-    badgeBg: 'bg-amber-950/40 text-amber-300',
-  },
-  {
-    label: 'Bajas',
-    count: '05',
-    sublabel: 'ÚLTIMAS 24 H',
-    textColor: 'text-cyan-400',
-    borderColor: 'border-cyan-900/30',
-    badgeBg: 'bg-cyan-950/40 text-cyan-300',
-  },
-]
+export const SeverityCounters: React.FC<SeverityCountersProps> = ({
+  counts = { critical: 0, high: 1, medium: 9, low: 0 },
+}) => {
+  const formatCount = (n: number) => (n < 10 ? `0${n}` : `${n}`)
 
-export const SeverityCounters: React.FC = () => {
+  const counters = [
+    {
+      label: 'Críticas',
+      count: formatCount(counts.critical),
+      sublabel: 'ÚLTIMAS 24 H',
+      textColor: 'text-rose-500',
+      borderColor: 'border-rose-900/30',
+      badgeBg: 'bg-rose-950/40 text-rose-400',
+    },
+    {
+      label: 'Altas',
+      count: formatCount(counts.high),
+      sublabel: 'ÚLTIMAS 24 H',
+      textColor: 'text-orange-500',
+      borderColor: 'border-orange-900/30',
+      badgeBg: 'bg-orange-950/40 text-orange-400',
+    },
+    {
+      label: 'Medias',
+      count: formatCount(counts.medium),
+      sublabel: 'ÚLTIMAS 24 H',
+      textColor: 'text-amber-400',
+      borderColor: 'border-amber-900/30',
+      badgeBg: 'bg-amber-950/40 text-amber-300',
+    },
+    {
+      label: 'Bajas / Normal',
+      count: formatCount(counts.low),
+      sublabel: 'ÚLTIMAS 24 H',
+      textColor: 'text-cyan-400',
+      borderColor: 'border-cyan-900/30',
+      badgeBg: 'bg-cyan-950/40 text-cyan-300',
+    },
+  ]
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
       {counters.map((item, idx) => (
@@ -60,7 +64,9 @@ export const SeverityCounters: React.FC = () => {
               </span>
             </div>
           </div>
-          <span className={`text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded border border-white/5 ${item.badgeBg}`}>
+          <span
+            className={`text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded border border-white/5 ${item.badgeBg}`}
+          >
             {item.sublabel}
           </span>
         </div>
@@ -69,3 +75,4 @@ export const SeverityCounters: React.FC = () => {
   )
 }
 
+export default SeverityCounters

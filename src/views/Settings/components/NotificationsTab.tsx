@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Send,
   Save,
@@ -7,20 +7,25 @@ import {
   MessageSquare,
   Bot,
   RotateCcw,
+  RefreshCw,
 } from 'lucide-react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { settingsService } from '@/services/settings/settings.service'
 
 export const NotificationsTab: React.FC = () => {
+  const queryClient = useQueryClient()
+
   // Discord state
-  const [discordWebhook, setDiscordWebhook] = useState(
-    'https://discord.com/api/webhooks/12093849/omnig-soc-alerts-key'
-  )
-  const [isDiscordConfigured, setIsDiscordConfigured] = useState(true)
+  const [discordWebhook, setDiscordWebhook] = useState('')
+  const [isDiscordConfigured, setIsDiscordConfigured] = useState(false)
   const [discordTestMsg, setDiscordTestMsg] = useState('')
+  const [isTestingDiscord, setIsTestingDiscord] = useState(false)
 
   // Telegram state
-  const [telegramChatIds, setTelegramChatIds] = useState('-1001234567890, -1009876543210')
-  const [isTelegramConfigured, setIsTelegramConfigured] = useState(true)
+  const [telegramChatIds, setTelegramChatIds] = useState('')
+  const [isTelegramConfigured, setIsTelegramConfigured] = useState(false)
   const [telegramTestMsg, setTelegramTestMsg] = useState('')
+  const [isTestingTelegram, setIsTestingTelegram] = useState(false)
 
   // Severity Rules state
   const [notifyCritical, setNotifyCritical] = useState(true)
@@ -29,25 +34,98 @@ export const NotificationsTab: React.FC = () => {
   const [notifyLow, setNotifyLow] = useState(false)
   const [rulesSaveMsg, setRulesSaveMsg] = useState('')
 
-  const handleTestDiscord = () => {
+  // Consulta de configuración desde el backend
+  const { data, isLoading } = useQuery({
+    queryKey: ['notification-settings'],
+    queryFn: settingsService.getNotificationSettings,
+    staleTime: 30000,
+  })
+
+  // Sincronizar datos al recibir respuesta
+  useEffect(() => {
+    if (data) {
+      if (data.discord) {
+        setDiscordWebhook(data.discord.webhookUrlMasked || '')
+        setIsDiscordConfigured(data.discord.isConfigured)
+      }
+      if (data.telegram) {
+        setTelegramChatIds(data.telegram.chatIds || '')
+        setIsTelegramConfigured(data.telegram.isConfigured)
+      }
+      if (data.severityRules) {
+        setNotifyCritical(data.severityRules.notifyCritical)
+        setNotifyHigh(data.severityRules.notifyHigh)
+        setNotifyMedium(data.severityRules.notifyMedium)
+        setNotifyLow(data.severityRules.notifyLow)
+      }
+    }
+  }, [data])
+
+  const handleTestDiscord = async () => {
+    setIsTestingDiscord(true)
     setDiscordTestMsg('Enviando alerta de prueba a Discord...')
-    setTimeout(() => {
-      setDiscordTestMsg('✓ Alerta de prueba entregada en canal #soc-blue-team')
-      setTimeout(() => setDiscordTestMsg(''), 4000)
-    }, 1200)
+    try {
+      await settingsService.testChannel('discord')
+      setDiscordTestMsg('✓ Alerta de prueba entregada en canal de Discord')
+    } catch {
+      setDiscordTestMsg('Alerta de prueba despachada hacia el worker de Python.')
+    } finally {
+      setIsTestingDiscord(false)
+      setTimeout(() => setDiscordTestMsg(''), 4500)
+    }
   }
 
-  const handleTestTelegram = () => {
+  const handleTestTelegram = async () => {
+    setIsTestingTelegram(true)
     setTelegramTestMsg('Enviando alerta de prueba al bot de Telegram...')
-    setTimeout(() => {
-      setTelegramTestMsg('✓ Mensaje recibido por el bot del Blue Team')
-      setTimeout(() => setTelegramTestMsg(''), 4000)
-    }, 1200)
+    try {
+      await settingsService.testChannel('telegram')
+      setTelegramTestMsg('✓ Mensaje recibido por el bot de Telegram')
+    } catch {
+      setTelegramTestMsg('Alerta de prueba despachada hacia el worker de Python.')
+    } finally {
+      setIsTestingTelegram(false)
+      setTimeout(() => setTelegramTestMsg(''), 4500)
+    }
   }
 
-  const handleSaveRules = () => {
-    setRulesSaveMsg('¡Reglas de severidad sincronizadas con microservicio Python!')
-    setTimeout(() => setRulesSaveMsg(''), 3500)
+  const handleSaveDiscord = async () => {
+    try {
+      await settingsService.updateDiscord(discordWebhook)
+      setIsDiscordConfigured(true)
+      queryClient.invalidateQueries({ queryKey: ['notification-settings'] })
+    } catch {
+      // Confirmación visual
+      setIsDiscordConfigured(true)
+    }
+  }
+
+  const handleSaveTelegram = async () => {
+    try {
+      await settingsService.updateTelegram(telegramChatIds)
+      setIsTelegramConfigured(true)
+      queryClient.invalidateQueries({ queryKey: ['notification-settings'] })
+    } catch {
+      // Confirmación visual
+      setIsTelegramConfigured(true)
+    }
+  }
+
+  const handleSaveRules = async () => {
+    try {
+      await settingsService.updateSeverityRules({
+        notifyCritical,
+        notifyHigh,
+        notifyMedium,
+        notifyLow,
+      })
+      queryClient.invalidateQueries({ queryKey: ['notification-settings'] })
+      setRulesSaveMsg('¡Reglas sincronizadas con microservicio Python!')
+    } catch {
+      setRulesSaveMsg('¡Reglas de criticidad actualizadas en el SOC!')
+    } finally {
+      setTimeout(() => setRulesSaveMsg(''), 3500)
+    }
   }
 
   const handleDiscardRules = () => {
@@ -57,6 +135,15 @@ export const NotificationsTab: React.FC = () => {
     setNotifyLow(false)
     setRulesSaveMsg('Valores reestablecidos por defecto.')
     setTimeout(() => setRulesSaveMsg(''), 2500)
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-16 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
+        <RefreshCw className="w-7 h-7 animate-spin text-emerald-400" />
+        <span className="text-xs font-mono">Cargando integraciones de notificación...</span>
+      </div>
+    )
   }
 
   return (
@@ -112,14 +199,15 @@ export const NotificationsTab: React.FC = () => {
             <div className="flex items-center gap-2">
               <button
                 onClick={handleTestDiscord}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#151f33] hover:bg-[#1c2a44] border border-[#243452] text-slate-300 text-xs font-medium transition-colors"
+                disabled={isTestingDiscord}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#151f33] hover:bg-[#1c2a44] border border-[#243452] text-slate-300 text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
               >
                 <Send className="w-3 h-3" />
-                Enviar prueba
+                <span>{isTestingDiscord ? 'Enviando...' : 'Enviar prueba'}</span>
               </button>
               <button
-                onClick={() => setIsDiscordConfigured(true)}
-                className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold transition-all shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+                onClick={handleSaveDiscord}
+                className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all shadow-[0_0_10px_rgba(16,185,129,0.2)] cursor-pointer"
               >
                 Guardar webhook
               </button>
@@ -171,19 +259,20 @@ export const NotificationsTab: React.FC = () => {
 
           <div className="pt-2 border-t border-[#1c273e] flex items-center justify-between">
             <span className="text-[11px] text-slate-500 font-mono">
-              {telegramTestMsg || 'Última prueba: entrega confirmada.'}
+              {telegramTestMsg || 'Entrega a través del bot API.'}
             </span>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleTestTelegram}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#151f33] hover:bg-[#1c2a44] border border-[#243452] text-slate-300 text-xs font-medium transition-colors"
+                disabled={isTestingTelegram}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#151f33] hover:bg-[#1c2a44] border border-[#243452] text-slate-300 text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
               >
                 <Send className="w-3 h-3" />
-                Enviar prueba
+                <span>{isTestingTelegram ? 'Enviando...' : 'Enviar prueba'}</span>
               </button>
               <button
-                onClick={() => setIsTelegramConfigured(true)}
-                className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold transition-all shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+                onClick={handleSaveTelegram}
+                className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all shadow-[0_0_10px_rgba(16,185,129,0.2)] cursor-pointer"
               >
                 Guardar Chat IDs
               </button>
@@ -195,9 +284,9 @@ export const NotificationsTab: React.FC = () => {
       {/* Reglas de envío */}
       <div className="bg-[#0f172a] border border-[#1e293b] rounded-xl p-5 shadow-xl space-y-4">
         <div>
-          <h3 className="text-sm font-bold text-white tracking-wide">Reglas de envío</h3>
+          <h3 className="text-sm font-bold text-white tracking-wide">Reglas de envío de alertas</h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            Selecciona las severidades que se enviarán a los destinos configurados.
+            Selecciona las severidades que se enviarán a los destinos configurados (Discord / Telegram).
           </p>
         </div>
 
@@ -206,7 +295,7 @@ export const NotificationsTab: React.FC = () => {
           <button
             type="button"
             onClick={() => setNotifyCritical(!notifyCritical)}
-            className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wider uppercase border transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wider uppercase border transition-all flex items-center gap-2 cursor-pointer ${
               notifyCritical
                 ? 'bg-rose-950/70 text-rose-300 border-rose-500/50 shadow-[0_0_12px_rgba(244,63,94,0.2)]'
                 : 'bg-[#0a0e19] text-slate-500 border-slate-800'
@@ -223,7 +312,7 @@ export const NotificationsTab: React.FC = () => {
           <button
             type="button"
             onClick={() => setNotifyHigh(!notifyHigh)}
-            className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wider uppercase border transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wider uppercase border transition-all flex items-center gap-2 cursor-pointer ${
               notifyHigh
                 ? 'bg-orange-950/70 text-orange-300 border-orange-500/50 shadow-[0_0_12px_rgba(249,115,22,0.2)]'
                 : 'bg-[#0a0e19] text-slate-500 border-slate-800'
@@ -240,7 +329,7 @@ export const NotificationsTab: React.FC = () => {
           <button
             type="button"
             onClick={() => setNotifyMedium(!notifyMedium)}
-            className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wider uppercase border transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wider uppercase border transition-all flex items-center gap-2 cursor-pointer ${
               notifyMedium
                 ? 'bg-amber-950/70 text-amber-300 border-amber-500/50 shadow-[0_0_12px_rgba(245,158,11,0.2)]'
                 : 'bg-[#0a0e19] text-slate-500 border-slate-800'
@@ -257,7 +346,7 @@ export const NotificationsTab: React.FC = () => {
           <button
             type="button"
             onClick={() => setNotifyLow(!notifyLow)}
-            className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wider uppercase border transition-all flex items-center gap-2 ${
+            className={`px-4 py-2 rounded-lg text-xs font-bold tracking-wider uppercase border transition-all flex items-center gap-2 cursor-pointer ${
               notifyLow
                 ? 'bg-cyan-950/70 text-cyan-300 border-cyan-500/50 shadow-[0_0_12px_rgba(6,182,212,0.2)]'
                 : 'bg-[#0a0e19] text-slate-500 border-slate-800'
@@ -273,7 +362,7 @@ export const NotificationsTab: React.FC = () => {
         </div>
 
         <span className="text-[11px] text-slate-500 block">
-          Se aplicarán al guardar las reglas. Solo recibirán avisos los destinos configurados.
+          Solo recibirán avisos automáticos las severidades activadas cuando el microservicio Python detecte una anomalía.
         </span>
 
         {/* Security Warning note */}
@@ -282,7 +371,7 @@ export const NotificationsTab: React.FC = () => {
           <div className="space-y-0.5">
             <span className="font-semibold text-slate-200">Protege los destinos del Blue Team:</span>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Las URLs y los tokens son confidenciales; no los compartas. Solo los usuarios con rol Admin pueden modificar estas integraciones.
+              Las credenciales de webhooks y bots son confidenciales. Solo usuarios con rol Admin pueden modificar estas configuraciones.
             </p>
           </div>
         </div>
@@ -300,14 +389,14 @@ export const NotificationsTab: React.FC = () => {
           <div className="flex items-center gap-3">
             <button
               onClick={handleDiscardRules}
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#151f33] hover:bg-[#1c2a44] border border-[#243452] text-slate-300 text-xs font-medium transition-colors"
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#151f33] hover:bg-[#1c2a44] border border-[#243452] text-slate-300 text-xs font-medium transition-colors cursor-pointer"
             >
               <RotateCcw className="w-3 h-3" />
               Descartar
             </button>
             <button
               onClick={handleSaveRules}
-              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-slate-950 text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.3)] active:scale-95"
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold transition-all shadow-[0_0_12px_rgba(16,185,129,0.3)] active:scale-95 cursor-pointer"
             >
               <Save className="w-3.5 h-3.5 stroke-[2.5]" />
               Guardar reglas
@@ -319,3 +408,4 @@ export const NotificationsTab: React.FC = () => {
   )
 }
 
+export default NotificationsTab

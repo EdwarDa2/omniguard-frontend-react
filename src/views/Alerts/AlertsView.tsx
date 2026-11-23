@@ -1,117 +1,95 @@
 import React, { useState } from 'react'
-import { Pause, Play } from 'lucide-react'
+import { Pause, Play, RefreshCw, AlertTriangle } from 'lucide-react'
 import { SeverityCounters } from './components/SeverityCounters'
-import { AlertsTable, type AlertItemRow } from './components/AlertsTable'
+import { AlertsTable } from './components/AlertsTable'
 import { AlertDetailPanel } from './components/AlertDetailPanel'
+import { useQuery } from '@tanstack/react-query'
+import { alertsService } from '@/services/alerts/alerts.service'
+import { useRealtimeAlerts } from '@/hooks/useRealtimeAlerts'
 import styles from './AlertsView.module.css'
-
-const mockAlerts: AlertItemRow[] = [
-  {
-    id: '1',
-    code: '102-1048',
-    time: '14:32:00',
-    severity: 'CRITICAL',
-    threat: 'SSH Brute Force',
-    sourceIp: '194.26.29.112',
-    destinationIp: '10.0.0.12',
-    status: 'EN_INVESTIGACION',
-    port: 'TCP / 22 (SSH)',
-    sensor: 'nids-01 / eth0',
-    heuristic: 'SSH_BRUTE_FORCE',
-    description:
-      'Se detectaron 120 intentos de autenticación SSH fallidos desde una misma IP en 60 segundos. El patrón supera el umbral de 20 intentos y sugiere un ataque de fuerza bruta.',
-    observedAttempts: 120,
-    threshold: 20,
-    suggestion: 'Bloquear accesos y validar el origen si no es un testeo de red.',
-  },
-  {
-    id: '2',
-    code: '102-1047',
-    time: '14:28:44',
-    severity: 'CRITICAL',
-    threat: 'SynFlood Attack',
-    sourceIp: '45.154.255.89',
-    destinationIp: '10.0.0.20',
-    status: 'EN_INVESTIGACION',
-    port: 'TCP / 80 (HTTP)',
-    sensor: 'nids-01 / eth0',
-    heuristic: 'TCP_SYN_FLOOD',
-    description:
-      'Volumen anormal de paquetes TCP SYN incompletos detectados hacia el servidor web balanceador.',
-    observedAttempts: 9850,
-    threshold: 1000,
-    suggestion: 'Activar SYN cookies en el kernel y verificar reglas de firewall perimetral.',
-  },
-  {
-    id: '3',
-    code: '102-1046',
-    time: '14:19:16',
-    severity: 'HIGH',
-    threat: 'Port Scan',
-    sourceIp: '198.51.100.24',
-    destinationIp: '10.0.0.12',
-    status: 'NUEVA',
-    port: 'Múltiples puertos',
-    sensor: 'nids-02 / eth1',
-    heuristic: 'PORT_SCAN_SWEEP',
-    description:
-      'Escaneo secuencial de puertos TCP 21, 22, 23, 80, 443, 3306 detectado en menos de 10 segundos.',
-    observedAttempts: 65,
-    threshold: 15,
-    suggestion: 'Bloqueo temporal de la IP en tabla iptables del host.',
-  },
-  {
-    id: '4',
-    code: '102-1045',
-    time: '13:58:11',
-    severity: 'WARNING',
-    threat: 'DNS Tunneling',
-    sourceIp: '10.0.0.48',
-    destinationIp: '203.0.113.8',
-    status: 'RESUELTA',
-    port: 'UDP / 53 (DNS)',
-    sensor: 'nids-01 / eth0',
-    heuristic: 'DNS_HIGH_ENTROPY',
-    description:
-      'Consultas TXT recurrentes con alta entropía y longitud excesiva de subdominios, compatible con exfiltración.',
-    observedAttempts: 42,
-    threshold: 10,
-    suggestion: 'Inspeccionar el host interno 10.0.0.48 en busca de malware activo.',
-  },
-  {
-    id: '5',
-    code: '102-1044',
-    time: '12:42:09',
-    severity: 'INFO',
-    threat: 'TLS Anomaly',
-    sourceIp: '172.16.0.44',
-    destinationIp: '10.0.0.20',
-    status: 'FALSO_POSITIVO',
-    port: 'TCP / 443 (HTTPS)',
-    sensor: 'nids-02 / eth1',
-    heuristic: 'TLS_UNCOMMON_CIPHER',
-    description:
-      'Negociación de cifrado TLS con suite legacy iniciada por script interno de monitoreo de uptime.',
-    observedAttempts: 3,
-    threshold: 2,
-    suggestion: 'Marcar como excepción / whitelist para la IP interna del monitor.',
-  },
-]
 
 export const AlertsView: React.FC = () => {
   const [isLive, setIsLive] = useState(true)
-  const [selectedId, setSelectedId] = useState<string>('1')
+  const [selectedId, setSelectedId] = useState<number | null>(null)
 
-  const selectedAlert = mockAlerts.find((a) => a.id === selectedId) || mockAlerts[0]
+  // Filtros y paginación
+  const [page, setPage] = useState(0)
+  const [search, setSearch] = useState('')
+  const [severity, setSeverity] = useState('')
+  const [status, setStatus] = useState('')
+
+  // Consulta paginada con TanStack Query
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['alerts', page, severity, status, search],
+    queryFn: () =>
+      alertsService.getAlerts({
+        page,
+        size: 10,
+        severity: severity || undefined,
+        status: status || undefined,
+        search: search || undefined,
+      }),
+    staleTime: 10000,
+  })
+
+  // Conexión Server-Sent Events (SSE) para recibir alertas en vivo
+  useRealtimeAlerts({
+    enabled: isLive,
+    onNewAlert: (newAlert) => {
+      setSelectedId(newAlert.id)
+    },
+  })
+
+  const alerts = data?.items || []
+  const total = data?.total || 0
+
+  // Seleccionar la primera alerta por defecto si no hay ninguna seleccionada
+  const activeAlertId = selectedId ?? (alerts.length > 0 ? alerts[0].id : null)
+  const selectedAlert = alerts.find((a) => a.id === activeAlertId) || (alerts[0] ?? null)
+
+  // Calcular contadores de severidad
+  const counts = {
+    critical: alerts.filter((a) => a.severity === 'CRITICAL').length,
+    high: alerts.filter((a) => a.severity === 'HIGH').length,
+    medium: alerts.filter((a) => a.severity === 'MEDIUM' || a.severity === 'WARNING').length,
+    low: alerts.filter((a) => a.severity === 'LOW' || a.severity === 'INFO' || a.severity === 'NORMAL').length,
+  }
+
+  // Exportar registros a formato CSV
+  const handleExportCsv = () => {
+    if (alerts.length === 0) return
+    const headers = ['ID', 'Hora', 'Severidad', 'Regla', 'Titulo', 'IP_Origen', 'IP_Destino', 'Puerto', 'Protocolo', 'Estado']
+    const rows = alerts.map((a) => [
+      a.id,
+      a.detectedAt,
+      a.severity,
+      a.rule,
+      `"${a.title.replace(/"/g, '""')}"`,
+      a.sourceIp,
+      a.destinationIp,
+      a.destinationPort,
+      a.protocol,
+      a.status,
+    ])
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `omniguard_alerts_${new Date().toISOString().slice(0, 10)}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
 
   return (
     <div className={styles.alertsContainer}>
-      {/* Top Title Bar with Live indicator */}
+      {/* Top Title Bar con Indicador SSE en Vivo */}
       <div className={styles.topBar}>
         <div>
           <h1 className={styles.viewTitle}>Alerts</h1>
           <p className={styles.viewSubtitle}>
-            Monitor NIDS: Detección de intrusiones y respuesta a incidentes
+            Monitor NIDS: Detección pasiva de intrusiones en tiempo real (C++ libpcap ➔ Python CVE)
           </p>
         </div>
 
@@ -122,39 +100,80 @@ export const AlertsView: React.FC = () => {
                 isLive ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
               }`}
             ></span>
-            {isLive ? 'En vivo' : 'En pausa'}
+            {isLive ? 'Canal SSE en Vivo' : 'SSE Pausado'}
           </div>
           <button
             onClick={() => setIsLive(!isLive)}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#151f33] hover:bg-[#1c2a44] border border-[#243452] text-slate-300 text-xs font-medium transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#151f33] hover:bg-[#1c2a44] border border-[#243452] text-slate-300 text-xs font-medium transition-colors cursor-pointer"
           >
             {isLive ? (
               <>
                 <Pause className="w-3.5 h-3.5" />
-                Pausar
+                Pausar Stream
               </>
             ) : (
               <>
                 <Play className="w-3.5 h-3.5" />
-                Reanudar
+                Reanudar Stream
               </>
             )}
           </button>
         </div>
       </div>
 
-      {/* 4 Severity KPI Counters */}
-      <SeverityCounters />
+      {/* 4 Contadores de Severidad */}
+      <SeverityCounters counts={counts} />
 
-      {/* Filterable Table */}
-      <AlertsTable
-        alerts={mockAlerts}
-        selectedAlertId={selectedId}
-        onSelectAlert={(id) => setSelectedId(id)}
-      />
+      {/* Control de error o carga */}
+      {isError ? (
+        <div className="p-6 bg-rose-950/30 border border-rose-500/30 rounded-xl text-center">
+          <AlertTriangle className="w-8 h-8 text-rose-400 mx-auto mb-2" />
+          <p className="text-xs text-rose-300">No se pudieron cargar los incidentes desde la API.</p>
+          <button
+            onClick={() => refetch()}
+            className="mt-3 px-3 py-1.5 bg-rose-500 text-slate-950 rounded text-xs font-bold"
+          >
+            Reintentar
+          </button>
+        </div>
+      ) : isLoading ? (
+        <div className="p-12 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
+          <RefreshCw className="w-6 h-6 animate-spin text-emerald-400" />
+          <span className="text-xs font-mono">Consultando eventos del sensor NIDS...</span>
+        </div>
+      ) : (
+        <>
+          {/* Tabla Paginada de Alertas */}
+          <AlertsTable
+            alerts={alerts}
+            total={total}
+            page={page}
+            size={10}
+            selectedAlertId={activeAlertId}
+            onSelectAlert={(id) => setSelectedId(id)}
+            onPageChange={(newPage) => setPage(newPage)}
+            searchQuery={search}
+            onSearchChange={(q) => {
+              setSearch(q)
+              setPage(0)
+            }}
+            severityFilter={severity}
+            onSeverityChange={(sev) => {
+              setSeverity(sev)
+              setPage(0)
+            }}
+            statusFilter={status}
+            onStatusChange={(st) => {
+              setStatus(st)
+              setPage(0)
+            }}
+            onExportCsv={handleExportCsv}
+          />
 
-      {/* Detail Panel */}
-      <AlertDetailPanel alert={selectedAlert} />
+          {/* Panel Forense de la Alerta Seleccionada */}
+          <AlertDetailPanel alert={selectedAlert} />
+        </>
+      )}
     </div>
   )
 }
