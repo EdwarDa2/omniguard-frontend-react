@@ -1,48 +1,31 @@
 import React from 'react'
-import type { SeverityLevel } from '@/types/soc.types'
+import type { RecentAlertDto } from '@/types/dashboard.types'
+import { AlertCircle } from 'lucide-react'
 
-interface AlertRow {
-  time: string
-  sourceIp: string
-  threat: string
-  severity: SeverityLevel
+interface RecentAlertsTableProps {
+  alerts?: RecentAlertDto[]
 }
-
-const recentAlerts: AlertRow[] = [
-  {
-    time: '14:32:00',
-    sourceIp: '194.26.29.112',
-    threat: 'SSH Brute Force',
-    severity: 'CRITICAL',
-  },
-  {
-    time: '14:28:44',
-    sourceIp: '45.154.255.89',
-    threat: 'SynFlood Attack',
-    severity: 'CRITICAL',
-  },
-  {
-    time: '14:15:02',
-    sourceIp: '185.220.101.5',
-    threat: 'Tor Exit Node',
-    severity: 'NORMAL',
-  },
-  {
-    time: '14:02:19',
-    sourceIp: '172.16.0.44',
-    threat: 'TLS Verification',
-    severity: 'NORMAL',
-  },
-]
 
 const severityBadgeStyles: Record<string, string> = {
-  CRITICAL: 'bg-rose-950/60 text-rose-400 border border-rose-500/40 shadow-[0_0_8px_rgba(244,63,94,0.15)]',
-  NORMAL: 'bg-emerald-950/60 text-emerald-400 border border-emerald-500/40 shadow-[0_0_8px_rgba(16,185,129,0.15)]',
+  CRITICAL:
+    'bg-rose-950/60 text-rose-400 border border-rose-500/40 shadow-[0_0_8px_rgba(244,63,94,0.15)]',
   HIGH: 'bg-orange-950/60 text-orange-400 border border-orange-500/40',
   WARNING: 'bg-amber-950/60 text-amber-400 border border-amber-500/40',
+  INFO: 'bg-blue-950/60 text-blue-400 border border-blue-500/40',
+  NORMAL:
+    'bg-emerald-950/60 text-emerald-400 border border-emerald-500/40 shadow-[0_0_8px_rgba(16,185,129,0.15)]',
 }
 
-export const RecentAlertsTable: React.FC = () => {
+export const RecentAlertsTable: React.FC<RecentAlertsTableProps> = ({ alerts = [] }) => {
+  if (alerts.length === 0) {
+    return (
+      <div className="py-8 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
+        <AlertCircle className="w-6 h-6 text-slate-600" />
+        <span className="text-xs font-mono">No se han registrado incidentes en las últimas horas</span>
+      </div>
+    )
+  }
+
   return (
     <div className="w-full overflow-x-auto">
       <table className="w-full text-left text-xs border-collapse">
@@ -55,9 +38,9 @@ export const RecentAlertsTable: React.FC = () => {
           </tr>
         </thead>
         <tbody className="divide-y divide-[#172236]">
-          {recentAlerts.map((row, index) => (
+          {alerts.map((row) => (
             <tr
-              key={index}
+              key={row.id}
               className="hover:bg-[#131d33] transition-colors group cursor-default"
             >
               <td className="py-3.5 px-4 font-mono text-slate-400 group-hover:text-slate-200">
@@ -71,7 +54,7 @@ export const RecentAlertsTable: React.FC = () => {
               </td>
               <td className="py-3.5 px-4 text-right">
                 <span
-                  className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase ${
+                  className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase border ${
                     severityBadgeStyles[row.severity] || severityBadgeStyles.NORMAL
                   }`}
                 >
@@ -85,3 +68,5 @@ export const RecentAlertsTable: React.FC = () => {
     </div>
   )
 }
+
+export default RecentAlertsTable
