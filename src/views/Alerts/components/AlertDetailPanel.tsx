@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { CheckCircle2, ShieldAlert, Save } from 'lucide-react'
 import type { AlertDto } from '@/types/alert.types'
 import { alertsService } from '@/services/alerts/alerts.service'
@@ -17,19 +17,10 @@ const statusOptions = [
 
 export const AlertDetailPanel: React.FC<AlertDetailPanelProps> = ({ alert }) => {
   const queryClient = useQueryClient()
-  const [selectedStatus, setSelectedStatus] = useState<string>('OPEN')
-  const [resolutionNotes, setResolutionNotes] = useState<string>('')
+  const [selectedStatus, setSelectedStatus] = useState<string>(alert?.status || 'NUEVA')
+  const [resolutionNotes, setResolutionNotes] = useState<string>(alert?.resolutionNotes || '')
   const [isSaving, setIsSaving] = useState(false)
   const [savedSuccess, setSavedSuccess] = useState(false)
-
-  // Sincronizar datos cada vez que cambie la alerta seleccionada
-  useEffect(() => {
-    if (alert) {
-      setSelectedStatus(alert.status)
-      setResolutionNotes(alert.resolutionNotes || '')
-      setSavedSuccess(false)
-    }
-  }, [alert])
 
   if (!alert) {
     return (

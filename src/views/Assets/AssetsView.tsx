@@ -5,6 +5,8 @@ import { AssetList } from './components/AssetList'
 import { AssetDetail } from './components/AssetDetail'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { assetsService } from '@/services/assets/assets.service'
+import { useRealtimeAlerts } from '@/hooks/useRealtimeAlerts'
+import type { ScanCompletedEventPayload } from '@/types/asset.types'
 import styles from './AssetsView.module.css'
 
 export const AssetsView: React.FC = () => {
@@ -29,40 +31,52 @@ export const AssetsView: React.FC = () => {
 
   const showNotification = (text: string, isError = false) => {
     setScanMessage({ text, isError })
-    setTimeout(() => setScanMessage(null), 4500)
+    setTimeout(() => setScanMessage(null), 5000)
   }
+
+  // Suscripción al evento SSE scan:completed para notificaciones en vivo en el topBar
+  useRealtimeAlerts({
+    onScanCompleted: (payload: ScanCompletedEventPayload) => {
+      showNotification(
+        `¡Escaneo finalizado en ${payload.targetIp}! ${payload.openPortsCount} puertos descubiertos y correlacionados con NVD.`,
+      )
+    },
+  })
 
   // Escaneo perimetral global
   const handleStartGlobalScan = async () => {
     setIsScanningAll(true)
-    showNotification('Emitiendo orden de escaneo masivo hacia microservicio C++...')
+    showNotification('Emitiendo orden de escaneo masivo hacia el motor de sondeo...')
     try {
-      await assetsService.scanAll()
+      const res = await assetsService.scanAll()
       queryClient.invalidateQueries({ queryKey: ['assets'] })
-      showNotification('¡Orden de escaneo perimetral encolada en Redis Pub/Sub!')
-    } catch {
-      showNotification(
-        'El bus de mensajería (Redis / C++) no está disponible en este momento.',
-        true,
-      )
+      showNotification(res.message || '¡Orden de escaneo perimetral encolada en Redis Pub/Sub!')
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { status?: number; data?: { message?: string } } }
+      if (errorObj.response?.status === 409) {
+        showNotification(
+          errorObj.response.data?.message || 'Objetivos no autorizados por la directiva de allowlist de la máquina.',
+          true,
+        )
+      } else if (errorObj.response?.status === 403) {
+        showNotification('Permisos insuficientes: se requiere rol de Administrador para escaneos.', true)
+      } else {
+        showNotification(
+          errorObj.response?.data?.message || 'El bus de mensajería (Redis / C++) no está disponible en este momento.',
+          true,
+        )
+      }
     } finally {
       setIsScanningAll(false)
     }
   }
 
-  // Escaneo dirigido a un activo
-  const handleRescanAsset = async (id: number) => {
-    showNotification(`Emitiendo orden de sondeo dirigido para host ID #${id}...`)
-    try {
-      await assetsService.scanAsset(id)
-      queryClient.invalidateQueries({ queryKey: ['assets'] })
-      showNotification(`¡Sondeo para host #${id} completado con éxito!`)
-    } catch {
-      showNotification(
-        `Sensor C++ ocupado o bus Redis desconectado para host #${id}.`,
-        true,
-      )
-    }
+  // Escaneo dirigido a un activo: retorna la promesa para que AssetDetail gestione el spinner y el timeout
+  const handleRescanAsset = async (id: number): Promise<void> => {
+    showNotification(`Orden de sondeo publicada para host ID #${id}...`)
+    const res = await assetsService.scanAsset(id)
+    queryClient.invalidateQueries({ queryKey: ['assets'] })
+    showNotification(res.message || `Sondeo en curso para host #${id}. A la espera de resultados...`)
   }
 
   return (
@@ -137,7 +151,11 @@ export const AssetsView: React.FC = () => {
             selectedAssetId={activeAssetId}
             onSelectAsset={(id) => setSelectedAssetId(id)}
           />
-          <AssetDetail asset={selectedAsset} onRescan={handleRescanAsset} />
+          <AssetDetail
+            key={activeAssetId ?? 'none'}
+            asset={selectedAsset}
+            onRescan={handleRescanAsset}
+          />
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import apiClient from '@/services/api/client'
-import type { AssetItem, AssetsResponse } from '@/types/asset.types'
+import type { AssetItem, AssetsResponse, ScanResponse } from '@/types/asset.types'
 
 /**
  * Servicio para consultar el inventario de activos y disparar escaneos activos (SurfaceScan).
@@ -8,9 +8,9 @@ export const assetsService = {
   /**
    * Obtiene la lista completa de activos con sus KPIs perimetrales.
    */
-  async getAssets(page = 0, size = 20): Promise<AssetsResponse> {
+  async getAssets(page = 0, size = 20, status?: string): Promise<AssetsResponse> {
     const response = await apiClient.get<AssetsResponse>('/assets', {
-      params: { page, size },
+      params: { page, size, ...(status ? { status } : {}) },
     })
     return response.data
   },
@@ -25,21 +25,23 @@ export const assetsService = {
 
   /**
    * Dispara una orden de escaneo dirigida hacia un activo específico.
-   * Publica la orden en Redis para que el Sensor C++ realice el sondeo.
+   * Publica la orden en Redis para que el Worker de escaneo realice el sondeo TCP.
    */
-  async scanAsset(id: number | string): Promise<{ status: string; scanId?: string }> {
-    const response = await apiClient.post<{ status: string; scanId?: string }>(
+  async scanAsset(id: number | string, ports = '1-1024'): Promise<ScanResponse> {
+    const response = await apiClient.post<ScanResponse>(
       `/assets/${id}/scan`,
+      ports ? { ports } : undefined,
     )
     return response.data
   },
 
   /**
-   * Dispara el barrido perimetral sobre todos los activos de la red.
+   * Dispara el barrido perimetral sobre todos los activos autorizados de la red.
    */
-  async scanAll(): Promise<{ status: string; scanId?: string }> {
-    const response = await apiClient.post<{ status: string; scanId?: string }>(
+  async scanAll(ports = '1-1024'): Promise<ScanResponse> {
+    const response = await apiClient.post<ScanResponse>(
       '/assets/scan-all',
+      ports ? { ports } : undefined,
     )
     return response.data
   },

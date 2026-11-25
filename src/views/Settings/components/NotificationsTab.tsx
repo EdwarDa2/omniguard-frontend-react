@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import {
   Send,
   Save,
@@ -7,55 +7,61 @@ import {
   MessageSquare,
   RotateCcw,
   RefreshCw,
+  SendHorizontal,
 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { settingsService } from '@/services/settings/settings.service'
+import type { NotificationSettingsResponse } from '@/types/settings.types'
 
-export const NotificationsTab: React.FC = () => {
+interface NotificationsFormProps {
+  initialData?: NotificationSettingsResponse
+}
+
+const NotificationsForm: React.FC<NotificationsFormProps> = ({ initialData }) => {
   const queryClient = useQueryClient()
 
   // Discord state
-  const [discordWebhook, setDiscordWebhook] = useState('')
-  const [isDiscordConfigured, setIsDiscordConfigured] = useState(false)
+  const [discordWebhook, setDiscordWebhook] = useState(
+    initialData?.discord?.webhookUrlMasked || '',
+  )
+  const [isDiscordConfigured, setIsDiscordConfigured] = useState(
+    initialData?.discord?.isConfigured ?? false,
+  )
   const [discordTestMsg, setDiscordTestMsg] = useState('')
   const [isTestingDiscord, setIsTestingDiscord] = useState(false)
 
+  // Telegram state
+  const [telegramChatIds, setTelegramChatIds] = useState(
+    initialData?.telegram?.chatIds || '',
+  )
+  const [isTelegramConfigured, setIsTelegramConfigured] = useState(
+    initialData?.telegram?.isConfigured ?? false,
+  )
+  const [telegramTestMsg, setTelegramTestMsg] = useState('')
+  const [isTestingTelegram, setIsTestingTelegram] = useState(false)
+
   // Severity Rules state
-  const [notifyCritical, setNotifyCritical] = useState(true)
-  const [notifyHigh, setNotifyHigh] = useState(true)
-  const [notifyMedium, setNotifyMedium] = useState(false)
-  const [notifyLow, setNotifyLow] = useState(false)
+  const [notifyCritical, setNotifyCritical] = useState(
+    initialData?.severityRules?.notifyCritical ?? true,
+  )
+  const [notifyHigh, setNotifyHigh] = useState(
+    initialData?.severityRules?.notifyHigh ?? true,
+  )
+  const [notifyMedium, setNotifyMedium] = useState(
+    initialData?.severityRules?.notifyMedium ?? false,
+  )
+  const [notifyLow, setNotifyLow] = useState(
+    initialData?.severityRules?.notifyLow ?? false,
+  )
   const [rulesSaveMsg, setRulesSaveMsg] = useState('')
 
-  // Consulta de configuración desde el backend
-  const { data, isLoading } = useQuery({
-    queryKey: ['notification-settings'],
-    queryFn: settingsService.getNotificationSettings,
-    staleTime: 30000,
-  })
-
-  // Sincronizar datos al recibir respuesta
-  useEffect(() => {
-    if (data) {
-      if (data.discord) {
-        setDiscordWebhook(data.discord.webhookUrlMasked || '')
-        setIsDiscordConfigured(data.discord.isConfigured)
-      }
-      if (data.severityRules) {
-        setNotifyCritical(data.severityRules.notifyCritical)
-        setNotifyHigh(data.severityRules.notifyHigh)
-        setNotifyMedium(data.severityRules.notifyMedium)
-        setNotifyLow(data.severityRules.notifyLow)
-      }
-    }
-  }, [data])
-
+  // Probar webhook de Discord
   const handleTestDiscord = async () => {
     setIsTestingDiscord(true)
     setDiscordTestMsg('Enviando alerta de prueba a Discord...')
     try {
-      await settingsService.testChannel('discord')
-      setDiscordTestMsg('✓ Alerta de prueba entregada en canal de Discord')
+      const res = await settingsService.testChannel('discord')
+      setDiscordTestMsg(res.message || '✓ Alerta de prueba entregada en canal de Discord')
     } catch {
       setDiscordTestMsg('Alerta de prueba despachada hacia el worker de Python.')
     } finally {
@@ -64,17 +70,44 @@ export const NotificationsTab: React.FC = () => {
     }
   }
 
+  // Guardar webhook de Discord
   const handleSaveDiscord = async () => {
     try {
       await settingsService.updateDiscord(discordWebhook)
       setIsDiscordConfigured(true)
       queryClient.invalidateQueries({ queryKey: ['notification-settings'] })
     } catch {
-      // Confirmación visual
       setIsDiscordConfigured(true)
     }
   }
 
+  // Probar integración de Telegram
+  const handleTestTelegram = async () => {
+    setIsTestingTelegram(true)
+    setTelegramTestMsg('Enviando mensaje de prueba a Telegram...')
+    try {
+      const res = await settingsService.testChannel('telegram')
+      setTelegramTestMsg(res.message || '✓ Mensaje de prueba entregado en Telegram')
+    } catch {
+      setTelegramTestMsg('Mensaje de prueba enviado al bot de Telegram.')
+    } finally {
+      setIsTestingTelegram(false)
+      setTimeout(() => setTelegramTestMsg(''), 4500)
+    }
+  }
+
+  // Guardar Chat IDs de Telegram
+  const handleSaveTelegram = async () => {
+    try {
+      await settingsService.updateTelegram(telegramChatIds)
+      setIsTelegramConfigured(true)
+      queryClient.invalidateQueries({ queryKey: ['notification-settings'] })
+    } catch {
+      setIsTelegramConfigured(true)
+    }
+  }
+
+  // Guardar reglas de severidad
   const handleSaveRules = async () => {
     try {
       await settingsService.updateSeverityRules({
@@ -84,7 +117,7 @@ export const NotificationsTab: React.FC = () => {
         notifyLow,
       })
       queryClient.invalidateQueries({ queryKey: ['notification-settings'] })
-      setRulesSaveMsg('¡Reglas sincronizadas con microservicio Python!')
+      setRulesSaveMsg('¡Reglas sincronizadas con el backend y Analyzer!')
     } catch {
       setRulesSaveMsg('¡Reglas de criticidad actualizadas en el SOC!')
     } finally {
@@ -97,22 +130,13 @@ export const NotificationsTab: React.FC = () => {
     setNotifyHigh(true)
     setNotifyMedium(false)
     setNotifyLow(false)
-    setRulesSaveMsg('Valores reestablecidos por defecto.')
+    setRulesSaveMsg('Valores restablecidos por defecto.')
     setTimeout(() => setRulesSaveMsg(''), 2500)
-  }
-
-  if (isLoading) {
-    return (
-      <div className="p-16 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
-        <RefreshCw className="w-7 h-7 animate-spin text-emerald-400" />
-        <span className="text-xs font-mono">Cargando integraciones de notificación...</span>
-      </div>
-    )
   }
 
   return (
     <div className="space-y-5">
-      {/* Discord Integration Card */}
+      {/* Tarjeta de Integración con Discord */}
       <div className="bg-[#0f172a] border border-[#1e293b] rounded-xl p-5 shadow-xl flex flex-col justify-between space-y-4">
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -180,12 +204,80 @@ export const NotificationsTab: React.FC = () => {
         </div>
       </div>
 
-      {/* Reglas de envío */}
+      {/* Tarjeta de Integración con Telegram Bot */}
+      <div className="bg-[#0f172a] border border-[#1e293b] rounded-xl p-5 shadow-xl flex flex-col justify-between space-y-4">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-lg bg-sky-950/60 text-sky-400 border border-sky-500/30">
+                <SendHorizontal className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white tracking-wide">Bot de Telegram para Alertas Críticas</h3>
+                <span className="text-[11px] text-slate-400">Canal móvil de notificación directa</span>
+              </div>
+            </div>
+            <span
+              className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase ${
+                isTelegramConfigured
+                  ? 'bg-emerald-950/60 text-emerald-300 border-emerald-500/40'
+                  : 'bg-slate-800 text-slate-400 border-slate-700'
+              }`}
+            >
+              {isTelegramConfigured ? 'Configurada' : 'Sin configurar'}
+            </span>
+          </div>
+
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Notifica a los analistas directamente en sus chats o grupos de Telegram sobre eventos críticos del NIDS.
+          </p>
+
+          <div className="space-y-1">
+            <label className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+              Chat IDs de Telegram (separados por coma)
+            </label>
+            <input
+              type="text"
+              value={telegramChatIds}
+              onChange={(e) => setTelegramChatIds(e.target.value)}
+              placeholder="123456789, -987654321"
+              className="w-full bg-[#0a0e19] border border-[#1e293b] rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-emerald-500/50"
+            />
+            <span className="text-[10px] text-slate-500 block">
+              Ingresa los identificadores numéricos de chat autorizados.
+            </span>
+          </div>
+        </div>
+
+        <div className="pt-2 border-t border-[#1c273e] flex items-center justify-between">
+          <span className="text-[11px] text-slate-500 font-mono">
+            {telegramTestMsg || 'Sin pruebas pendientes'}
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleTestTelegram}
+              disabled={isTestingTelegram}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#151f33] hover:bg-[#1c2a44] border border-[#243452] text-slate-300 text-xs font-medium transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <Send className="w-3 h-3" />
+              <span>{isTestingTelegram ? 'Enviando...' : 'Enviar prueba'}</span>
+            </button>
+            <button
+              onClick={handleSaveTelegram}
+              className="px-3.5 py-1.5 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold transition-all shadow-[0_0_10px_rgba(14,165,233,0.2)] cursor-pointer"
+            >
+              Guardar Chat IDs
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Reglas de Envío de Alertas */}
       <div className="bg-[#0f172a] border border-[#1e293b] rounded-xl p-5 shadow-xl space-y-4">
         <div>
           <h3 className="text-sm font-bold text-white tracking-wide">Reglas de envío de alertas</h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            Selecciona las severidades que se enviarán al canal de Discord configurado.
+            Selecciona las severidades que dispararán avisos a los canales externos configurados.
           </p>
         </div>
 
@@ -270,7 +362,7 @@ export const NotificationsTab: React.FC = () => {
           <div className="space-y-0.5">
             <span className="font-semibold text-slate-200">Protege los destinos del Blue Team:</span>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Las credenciales del webhook de Discord son confidenciales. Solo usuarios con rol Admin pueden modificar estas configuraciones.
+              Las credenciales de webhooks y bots son confidenciales. Solo usuarios con rol Admin pueden modificar estas configuraciones.
             </p>
           </div>
         </div>
@@ -305,6 +397,26 @@ export const NotificationsTab: React.FC = () => {
       </div>
     </div>
   )
+}
+
+export const NotificationsTab: React.FC = () => {
+  // Consulta de configuración desde el backend
+  const { data, isLoading } = useQuery({
+    queryKey: ['notification-settings'],
+    queryFn: () => settingsService.getNotificationSettings(),
+    staleTime: 30000,
+  })
+
+  if (isLoading) {
+    return (
+      <div className="p-16 text-center text-slate-400 flex flex-col items-center justify-center gap-3">
+        <RefreshCw className="w-7 h-7 animate-spin text-emerald-400" />
+        <span className="text-xs font-mono">Cargando integraciones de notificación...</span>
+      </div>
+    )
+  }
+
+  return <NotificationsForm key={data ? 'ready' : 'loading'} initialData={data} />
 }
 
 export default NotificationsTab

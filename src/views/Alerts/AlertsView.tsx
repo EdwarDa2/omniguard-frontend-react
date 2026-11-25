@@ -171,7 +171,7 @@ export const AlertsView: React.FC = () => {
           />
 
           {/* Panel Forense de la Alerta Seleccionada */}
-          <AlertDetailPanel alert={selectedAlert} />
+          <AlertDetailPanel key={activeAlertId ?? 'none'} alert={selectedAlert} />
         </>
       )}
     </div>

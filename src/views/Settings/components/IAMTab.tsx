@@ -32,7 +32,7 @@ export const IAMTab: React.FC = () => {
   // Consulta de usuarios desde el backend de IAM
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['users'],
-    queryFn: settingsService.getUsers,
+    queryFn: () => settingsService.getUsers(),
     staleTime: 15000,
   })
 

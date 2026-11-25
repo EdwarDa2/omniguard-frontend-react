@@ -4,6 +4,8 @@ import type {
   SeverityRules,
   UsersResponse,
   CreateUserInput,
+  PlatformUserDto,
+  NotificationTestResponse,
 } from '@/types/settings.types'
 
 /**
@@ -23,29 +25,41 @@ export const settingsService = {
   /**
    * Actualiza la URL de webhook para Discord.
    */
-  async updateDiscord(webhookUrl: string): Promise<void> {
-    await apiClient.put('/settings/notifications/discord', { webhookUrl })
+  async updateDiscord(webhookUrl: string): Promise<{ status: string; isConfigured: boolean; message: string }> {
+    const response = await apiClient.put<{ status: string; isConfigured: boolean; message: string }>(
+      '/settings/notifications/discord',
+      { webhookUrl },
+    )
+    return response.data
   },
 
   /**
    * Actualiza los Chat IDs de destino para Telegram.
    */
-  async updateTelegram(chatIds: string): Promise<void> {
-    await apiClient.put('/settings/notifications/telegram', { chatIds })
+  async updateTelegram(chatIds: string): Promise<{ status: string; isConfigured: boolean; message: string }> {
+    const response = await apiClient.put<{ status: string; isConfigured: boolean; message: string }>(
+      '/settings/notifications/telegram',
+      { chatIds },
+    )
+    return response.data
   },
 
   /**
    * Guarda los umbrales de severidad que disparan alertas hacia el Blue Team.
    */
-  async updateSeverityRules(rules: SeverityRules): Promise<void> {
-    await apiClient.put('/settings/notifications/rules', rules)
+  async updateSeverityRules(rules: SeverityRules): Promise<{ status: string; message: string }> {
+    const response = await apiClient.put<{ status: string; message: string }>(
+      '/settings/notifications/rules',
+      rules,
+    )
+    return response.data
   },
 
   /**
    * Envía una notificación sintética de prueba a Discord o Telegram.
    */
-  async testChannel(channel: 'discord' | 'telegram'): Promise<{ message?: string }> {
-    const response = await apiClient.post<{ message?: string }>(
+  async testChannel(channel: 'discord' | 'telegram'): Promise<NotificationTestResponse> {
+    const response = await apiClient.post<NotificationTestResponse>(
       `/settings/notifications/test/${channel}`,
     )
     return response.data
@@ -54,32 +68,38 @@ export const settingsService = {
   /**
    * Obtiene la lista de operadores y métricas de IAM.
    */
-  async getUsers(): Promise<UsersResponse> {
-    const response = await apiClient.get<UsersResponse>('/users')
+  async getUsers(page = 0, size = 50): Promise<UsersResponse> {
+    const response = await apiClient.get<UsersResponse>('/users', {
+      params: { page, size },
+    })
     return response.data
   },
 
   /**
-   * Crea un nuevo analista registrando su usuario en la base de datos de IAM.
+   * Crea un nuevo analista registrando su usuario en la base de datos de IAM (contraseña generada por backend).
    */
-  async createUser(input: CreateUserInput): Promise<void> {
-    const username = input.name.toLowerCase().replace(/[^a-z0-9]/g, '')
-    const role = input.role === 'Admin' ? 'ROLE_ADMIN' : 'ROLE_VIEWER'
-    const password = input.password || 'OmniGuard2026!'
-
-    await apiClient.post('/auth/register', {
-      username,
+  async createUser(input: CreateUserInput): Promise<PlatformUserDto> {
+    const response = await apiClient.post<PlatformUserDto>('/users', {
+      name: input.name,
       email: input.email,
-      password,
-      role,
+      role: input.role,
     })
+    return response.data
   },
 
   /**
    * Modifica el estado de acceso de un analista (Activo / Revocado).
    */
-  async updateUserStatus(id: string, status: string): Promise<void> {
-    await apiClient.patch(`/users/${id}/status`, { status })
+  async updateUserStatus(id: string, status: 'Activo' | 'Revocado'): Promise<PlatformUserDto> {
+    const response = await apiClient.patch<PlatformUserDto>(`/users/${id}/status`, { status })
+    return response.data
+  },
+
+  /**
+   * Elimina un usuario de la plataforma.
+   */
+  async deleteUser(id: string): Promise<void> {
+    await apiClient.delete(`/users/${id}`)
   },
 }
 

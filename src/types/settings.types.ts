@@ -1,5 +1,3 @@
-import type { PlatformUser } from '@/types/soc.types'
-
 export interface DiscordSettings {
   webhookUrlMasked: string
   isConfigured: boolean
@@ -23,20 +21,59 @@ export interface NotificationSettingsResponse {
   severityRules: SeverityRules
 }
 
-export interface UserMetrics {
+export interface UpdateDiscordRequest {
+  webhookUrl: string
+}
+
+export interface UpdateTelegramRequest {
+  chatIds: string
+}
+
+export interface UpdateSeverityRulesRequest {
+  notifyCritical: boolean
+  notifyHigh: boolean
+  notifyMedium: boolean
+  notifyLow: boolean
+}
+
+export interface NotificationTestResponse {
+  channel: 'discord' | 'telegram'
+  delivered: boolean
+  message: string
+}
+
+export interface UserMetricsDto {
   activeCount: number
   adminCount: number
   revokedCount: number
 }
 
-export interface UsersResponse {
-  metrics: UserMetrics
-  users: PlatformUser[]
-}
-
-export interface CreateUserInput {
+export interface PlatformUserDto {
+  id: string
   name: string
   email: string
   role: 'Admin' | 'Viewer'
-  password?: string
+  status: 'Activo' | 'Revocado'
+  lastLogin: string
+  isCurrentUser: boolean
 }
+
+export interface UserListResponseDto {
+  metrics: UserMetricsDto
+  users: PlatformUserDto[]
+}
+
+export interface CreateUserRequestDto {
+  name: string
+  email: string
+  role?: 'Admin' | 'Viewer'
+}
+
+export interface UpdateUserStatusRequestDto {
+  status: 'Activo' | 'Revocado'
+}
+
+// Aliases retrocompatibles
+export type UserMetrics = UserMetricsDto
+export type UsersResponse = UserListResponseDto
+export type CreateUserInput = CreateUserRequestDto
