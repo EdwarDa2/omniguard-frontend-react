@@ -8,6 +8,7 @@ export interface RealtimeAlertsOptions {
   onNewAlert?: (alert: AlertDto) => void
   onAlertUpdate?: (update: { id: string; status: string; updatedAt: string }) => void
   onScanCompleted?: (scanResult: ScanCompletedEventPayload) => void
+  onSensorStatusChange?: (status: string) => void
 }
 
 // Estado singleton compartido para evitar múltiples conexiones EventSource simultáneas
@@ -32,6 +33,7 @@ export function useRealtimeAlerts({
   onNewAlert,
   onAlertUpdate,
   onScanCompleted,
+  onSensorStatusChange,
 }: RealtimeAlertsOptions = {}) {
   const queryClient = useQueryClient()
 
@@ -45,6 +47,7 @@ export function useRealtimeAlerts({
       onNewAlert,
       onAlertUpdate,
       onScanCompleted,
+      onSensorStatusChange,
     }
     activeSubscribers.add(subscriber)
 
@@ -122,6 +125,21 @@ export function useRealtimeAlerts({
         }
       })
 
+      // 4. Cambio de estado operativo del sensor NIDS
+      es.addEventListener('sensor:status', (event: MessageEvent) => {
+        try {
+          const statusPayload = JSON.parse(event.data) as { status: string; timestamp?: string }
+          queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+          queryClient.invalidateQueries({ queryKey: ['sensor-status'] })
+
+          activeSubscribers.forEach((sub) => {
+            sub.onSensorStatusChange?.(statusPayload.status)
+          })
+        } catch (e) {
+          console.warn('[SSE] Error procesando evento sensor:status:', e)
+        }
+      })
+
       // Mensaje de inicialización o ping
       es.onmessage = (event: MessageEvent) => {
         if (event.data && event.data !== 'ping') {
@@ -169,7 +187,7 @@ export function useRealtimeAlerts({
         }, 3000)
       }
     }
-  }, [enabled, queryClient, onNewAlert, onAlertUpdate, onScanCompleted])
+  }, [enabled, queryClient, onNewAlert, onAlertUpdate, onScanCompleted, onSensorStatusChange])
 }
 
 export default useRealtimeAlerts
