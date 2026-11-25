@@ -90,8 +90,9 @@ export const DashboardView: React.FC = () => {
               <RefreshCw className="w-3 h-3 text-slate-500 animate-spin" />
             )}
           </div>
-          <span className="text-[11px] text-slate-500 font-mono">
-            Sondeo dinámico cada 15s
+          <span className="text-[11px] text-emerald-400/80 font-mono flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+            Telemetría en vivo vía SSE
           </span>
         </div>
         <TrafficChart traffic={trafficActivity} />

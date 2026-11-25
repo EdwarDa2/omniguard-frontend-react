@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import type { AlertDto } from '@/types/alert.types'
 import type { ScanCompletedEventPayload } from '@/types/asset.types'
+import type { DashboardStatsResponse, TrafficActivity } from '@/types/dashboard.types'
 
 export interface RealtimeAlertsOptions {
   enabled?: boolean
@@ -9,6 +10,7 @@ export interface RealtimeAlertsOptions {
   onAlertUpdate?: (update: { id: string; status: string; updatedAt: string }) => void
   onScanCompleted?: (scanResult: ScanCompletedEventPayload) => void
   onSensorStatusChange?: (status: string) => void
+  onTrafficMetrics?: (metrics: TrafficActivity) => void
 }
 
 // Estado singleton compartido para evitar múltiples conexiones EventSource simultáneas
@@ -34,6 +36,7 @@ export function useRealtimeAlerts({
   onAlertUpdate,
   onScanCompleted,
   onSensorStatusChange,
+  onTrafficMetrics,
 }: RealtimeAlertsOptions = {}) {
   const queryClient = useQueryClient()
 
@@ -48,6 +51,7 @@ export function useRealtimeAlerts({
       onAlertUpdate,
       onScanCompleted,
       onSensorStatusChange,
+      onTrafficMetrics,
     }
     activeSubscribers.add(subscriber)
 
@@ -140,6 +144,28 @@ export function useRealtimeAlerts({
         }
       })
 
+      // 5. Telemetría de tráfico en vivo desde el sensor NIDS (actualización reactiva en tiempo real)
+      es.addEventListener('traffic:metrics', (event: MessageEvent) => {
+        try {
+          const trafficPayload = JSON.parse(event.data) as TrafficActivity
+
+          // Actualizar directamente la caché de dashboard-stats en TanStack Query sin petición HTTP
+          queryClient.setQueryData<DashboardStatsResponse>(['dashboard-stats'], (oldData) => {
+            if (!oldData) return oldData
+            return {
+              ...oldData,
+              trafficActivity: trafficPayload,
+            }
+          })
+
+          activeSubscribers.forEach((sub) => {
+            sub.onTrafficMetrics?.(trafficPayload)
+          })
+        } catch (e) {
+          console.warn('[SSE] Error procesando evento traffic:metrics:', e)
+        }
+      })
+
       // Mensaje de inicialización o ping
       es.onmessage = (event: MessageEvent) => {
         if (event.data && event.data !== 'ping') {
@@ -187,7 +213,7 @@ export function useRealtimeAlerts({
         }, 3000)
       }
     }
-  }, [enabled, queryClient, onNewAlert, onAlertUpdate, onScanCompleted, onSensorStatusChange])
+  }, [enabled, queryClient, onNewAlert, onAlertUpdate, onScanCompleted, onSensorStatusChange, onTrafficMetrics])
 }
 
 export default useRealtimeAlerts

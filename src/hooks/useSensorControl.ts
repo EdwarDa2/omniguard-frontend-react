@@ -19,10 +19,14 @@ export function useSensorControl() {
 
       if (previousStats) {
         const targetStatus = action === 'START' ? 'ACTIVE' : 'PAUSED'
+        const isStopping = action === 'STOP'
+
         queryClient.setQueryData<DashboardStatsResponse>(['dashboard-stats'], {
           ...previousStats,
           trafficActivity: {
             ...previousStats.trafficActivity,
+            currentPacketsPerSec: isStopping ? 0 : previousStats.trafficActivity.currentPacketsPerSec,
+            bandwidthMbps: isStopping ? 0.0 : previousStats.trafficActivity.bandwidthMbps,
             sensorStatus: targetStatus,
           },
         })
