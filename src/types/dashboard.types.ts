@@ -17,6 +17,7 @@ export interface TrafficActivity {
   bandwidthMbps: number
   sensorStatus: string
   timeSeries: TrafficDataPoint[]
+  sensorId?: string
 }
 
 export interface RecentAlertDto {
@@ -25,6 +26,7 @@ export interface RecentAlertDto {
   sourceIp: string
   threat: string
   severity: SeverityLevel
+  timestamp?: string
 }
 
 export interface DashboardStatsResponse {

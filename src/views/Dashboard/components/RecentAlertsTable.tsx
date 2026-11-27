@@ -21,7 +21,10 @@ export const RecentAlertsTable: React.FC<RecentAlertsTableProps> = ({ alerts = [
     return (
       <div className="py-8 text-center text-slate-500 flex flex-col items-center justify-center gap-2">
         <AlertCircle className="w-6 h-6 text-slate-600" />
-        <span className="text-xs font-mono">No se han registrado incidentes en las últimas horas</span>
+        <span className="text-xs font-mono text-slate-300">No se han registrado incidentes en esta sesión de monitoreo</span>
+        <span className="text-[11px] font-mono text-slate-500">
+          El motor heurístico y las reglas NIDS están escuchando en vivo el tráfico del sensor
+        </span>
       </div>
     )
   }

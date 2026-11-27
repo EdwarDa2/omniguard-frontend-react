@@ -7,7 +7,8 @@ export const ProtectedRoute: React.FC = () => {
   const location = useLocation()
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace state={{ from: location }} />
+    const search = location.search ? location.search : ''
+    return <Navigate to={`/login${search}`} replace state={{ from: location }} />
   }
 
   return <Outlet />

@@ -1,13 +1,24 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { KpiCard } from './components/KpiCard'
 import { TrafficChart } from './components/TrafficChart'
 import { RecentAlertsTable } from './components/RecentAlertsTable'
 import { useDashboardStats } from '@/hooks/useDashboardStats'
-import { RefreshCw, AlertTriangle } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { resetSessionStartTime } from '@/utils/sessionTime'
+import { RefreshCw, AlertTriangle, RotateCcw } from 'lucide-react'
 import styles from './DashboardView.module.css'
 
 export const DashboardView: React.FC = () => {
+  const queryClient = useQueryClient()
+  const [isResetting, setIsResetting] = useState(false)
   const { data, isLoading, isError, refetch, isFetching } = useDashboardStats()
+
+  const handleResetSession = () => {
+    setIsResetting(true)
+    resetSessionStartTime()
+    queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] })
+    setTimeout(() => setIsResetting(false), 500)
+  }
 
   if (isLoading) {
     return (
@@ -101,10 +112,24 @@ export const DashboardView: React.FC = () => {
       {/* Tabla de Alertas Recientes */}
       <section className={styles.cardPanel}>
         <div className={styles.cardHeader}>
-          <h2 className={styles.cardTitle}>Recent Alerts</h2>
-          <span className="text-[11px] text-slate-500 font-mono">
-            {recentAlerts.length} incidentes detectados
-          </span>
+          <div className="flex items-center gap-2">
+            <h2 className={styles.cardTitle}>Recent Alerts (Live Session)</h2>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
+              {recentAlerts.length === 0 ? 'Sesión limpia (0 incidentes)' : `${recentAlerts.length} incidente(s) en sesión`}
+            </span>
+            <button
+              onClick={handleResetSession}
+              disabled={isResetting}
+              title="Reinicia el monitor de incidentes a 0 para comenzar una nueva prueba sin alterar la base de datos forense"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#1e293b]/70 hover:bg-[#334155] border border-slate-700/60 hover:border-emerald-500/50 text-slate-300 hover:text-emerald-400 text-[11px] font-medium transition-all cursor-pointer shadow-sm disabled:opacity-50 select-none"
+            >
+              <RotateCcw className={`w-3 h-3 ${isResetting ? 'animate-spin text-emerald-400' : ''}`} />
+              <span>Reiniciar Monitor</span>
+            </button>
+          </div>
         </div>
         <RecentAlertsTable alerts={recentAlerts} />
       </section>

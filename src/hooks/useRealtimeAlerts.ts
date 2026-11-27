@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { getActiveSensorId } from '@/utils/sensorId'
 import type { AlertDto } from '@/types/alert.types'
 import type { ScanCompletedEventPayload } from '@/types/asset.types'
 import type { DashboardStatsResponse, TrafficActivity } from '@/types/dashboard.types'
@@ -148,9 +149,15 @@ export function useRealtimeAlerts({
       es.addEventListener('traffic:metrics', (event: MessageEvent) => {
         try {
           const trafficPayload = JSON.parse(event.data) as TrafficActivity
+          const currentSensorId = getActiveSensorId()
+
+          // Aislamiento multi-dispositivo: descartar métricas si no pertenecen a este sensor
+          if (currentSensorId && trafficPayload.sensorId && trafficPayload.sensorId !== currentSensorId) {
+            return
+          }
 
           // Actualizar directamente la caché de dashboard-stats en TanStack Query sin petición HTTP
-          queryClient.setQueryData<DashboardStatsResponse>(['dashboard-stats'], (oldData) => {
+          queryClient.setQueryData<DashboardStatsResponse>(['dashboard-stats', currentSensorId || undefined], (oldData) => {
             if (!oldData) return oldData
             return {
               ...oldData,

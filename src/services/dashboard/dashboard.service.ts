@@ -7,9 +7,16 @@ import type { DashboardStatsResponse } from '@/types/dashboard.types'
 export const dashboardService = {
   /**
    * Obtiene los 4 KPIs principales, telemetría de red y alertas recientes.
+   * Permite filtrar las métricas por sensor_id para aislamiento multi-dispositivo
+   * y por since (ISO-8601) para ciclo de vida de alertas por sesión activa (Opción C).
    */
-  async getStats(): Promise<DashboardStatsResponse> {
-    const response = await apiClient.get<DashboardStatsResponse>('/dashboard/stats')
+  async getStats(sensorId?: string, since?: string): Promise<DashboardStatsResponse> {
+    const params: Record<string, string> = {}
+    if (sensorId) params.sensor_id = sensorId
+    if (since) params.since = since
+    const response = await apiClient.get<DashboardStatsResponse>('/dashboard/stats', {
+      params: Object.keys(params).length > 0 ? params : undefined,
+    })
     return response.data
   },
 }

@@ -75,6 +75,11 @@ export const TrafficChart: React.FC<TrafficChartProps> = ({ traffic }) => {
               }`}
             />
             <span>SENSOR {sensorStatusLabel}</span>
+            {traffic?.sensorId && traffic.sensorId !== 'default-host' && (
+              <span className="text-[10px] text-slate-300 font-mono pl-1 border-l border-slate-700/60 font-medium">
+                {traffic.sensorId}
+              </span>
+            )}
           </div>
 
           <button
