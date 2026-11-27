@@ -6,11 +6,16 @@ import { AlertDetailPanel } from './components/AlertDetailPanel'
 import { useQuery } from '@tanstack/react-query'
 import { alertsService } from '@/services/alerts/alerts.service'
 import { useRealtimeAlerts } from '@/hooks/useRealtimeAlerts'
+import { getSessionStartTime, resetSessionStartTime } from '@/utils/sessionTime'
 import styles from './AlertsView.module.css'
 
 export const AlertsView: React.FC = () => {
   const [isLive, setIsLive] = useState(true)
   const [selectedId, setSelectedId] = useState<number | null>(null)
+
+  // Ámbito de visualización: Sesión actual (por defecto para demo limpia) vs Historial completo
+  const [scope, setScope] = useState<'session' | 'all'>('session')
+  const [sessionSince, setSessionSince] = useState<string>(() => getSessionStartTime())
 
   // Filtros y paginación
   const [page, setPage] = useState(0)
@@ -18,9 +23,15 @@ export const AlertsView: React.FC = () => {
   const [severity, setSeverity] = useState('')
   const [status, setStatus] = useState('')
 
+  const handleResetSession = () => {
+    const newStart = resetSessionStartTime()
+    setSessionSince(newStart)
+    setPage(0)
+  }
+
   // Consulta paginada con TanStack Query
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['alerts', page, severity, status, search],
+    queryKey: ['alerts', page, severity, status, search, scope, sessionSince],
     queryFn: () =>
       alertsService.getAlerts({
         page,
@@ -28,8 +39,9 @@ export const AlertsView: React.FC = () => {
         severity: severity || undefined,
         status: status || undefined,
         search: search || undefined,
+        from: scope === 'session' ? sessionSince : undefined,
       }),
-    staleTime: 10000,
+    staleTime: 5000,
   })
 
   // Conexión Server-Sent Events (SSE) para recibir alertas en vivo
@@ -168,6 +180,12 @@ export const AlertsView: React.FC = () => {
               setPage(0)
             }}
             onExportCsv={handleExportCsv}
+            scope={scope}
+            onScopeChange={(newScope) => {
+              setScope(newScope)
+              setPage(0)
+            }}
+            onResetSession={handleResetSession}
           />
 
           {/* Panel Forense de la Alerta Seleccionada */}

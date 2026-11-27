@@ -30,6 +30,8 @@ export interface AlertFilterParams {
   severity?: string
   status?: string
   search?: string
+  from?: string
+  to?: string
 }
 
 export interface UpdateAlertStatusPayload {

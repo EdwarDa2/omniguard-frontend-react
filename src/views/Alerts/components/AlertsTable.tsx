@@ -1,5 +1,5 @@
 import React from 'react'
-import { Search, Download, ChevronLeft, ChevronRight, ChevronRight as RowChevron, AlertCircle } from 'lucide-react'
+import { Search, Download, ChevronLeft, ChevronRight, ChevronRight as RowChevron, AlertCircle, Database, RotateCcw } from 'lucide-react'
 import type { AlertDto } from '@/types/alert.types'
 
 interface AlertsTableProps {
@@ -17,6 +17,9 @@ interface AlertsTableProps {
   statusFilter: string
   onStatusChange: (st: string) => void
   onExportCsv: () => void
+  scope: 'session' | 'all'
+  onScopeChange: (scope: 'session' | 'all') => void
+  onResetSession: () => void
 }
 
 const severityBadgeMap: Record<string, { label: string; badge: string }> = {
@@ -76,6 +79,9 @@ export const AlertsTable: React.FC<AlertsTableProps> = ({
   statusFilter,
   onStatusChange,
   onExportCsv,
+  scope,
+  onScopeChange,
+  onResetSession,
 }) => {
   const totalPages = Math.max(1, Math.ceil(total / size))
   const startItem = total === 0 ? 0 : page * size + 1
@@ -85,19 +91,61 @@ export const AlertsTable: React.FC<AlertsTableProps> = ({
     <div className="bg-[#0f172a] border border-[#1e293b] rounded-xl p-5 shadow-xl space-y-4">
       {/* Cabecera de la tabla */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-3">
           <h2 className="text-sm font-bold text-white tracking-wide">Registro de alertas NIDS</h2>
+
+          {/* Selector de Ámbito: Sesión Actual vs Historial Completo */}
+          <div className="flex items-center p-0.5 rounded-lg bg-[#0a0e19] border border-[#1e293b]">
+            <button
+              type="button"
+              onClick={() => onScopeChange('session')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+                scope === 'session'
+                  ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 border border-transparent'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${scope === 'session' ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+              <span>Sesión Actual</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onScopeChange('all')}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+                scope === 'all'
+                  ? 'bg-sky-950/80 text-sky-300 border border-sky-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 border border-transparent'
+              }`}
+            >
+              <Database className="w-3 h-3" />
+              <span>Historial Completo</span>
+            </button>
+          </div>
+
           <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-300 text-[11px] font-medium font-mono">
-            {total} incidentes en base de datos
+            {scope === 'session' ? `${total} en sesión activa` : `${total} en base de datos`}
           </span>
         </div>
-        <button
-          onClick={onExportCsv}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#172236] hover:bg-[#1e2d47] border border-[#243452] text-slate-200 text-xs font-medium transition-colors cursor-pointer"
-        >
-          <Download className="w-3.5 h-3.5 text-slate-400" />
-          Exportar CSV
-        </button>
+
+        <div className="flex items-center gap-2">
+          {scope === 'session' && (
+            <button
+              onClick={onResetSession}
+              title="Reinicia el monitor de la sesión a 0 sin alterar la base de datos forense"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#172236] hover:bg-[#1e2d47] border border-[#243452] text-slate-300 hover:text-emerald-400 text-xs font-medium transition-colors cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-slate-400 hover:text-emerald-400" />
+              <span>Reiniciar Monitor</span>
+            </button>
+          )}
+          <button
+            onClick={onExportCsv}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#172236] hover:bg-[#1e2d47] border border-[#243452] text-slate-200 text-xs font-medium transition-colors cursor-pointer"
+          >
+            <Download className="w-3.5 h-3.5 text-slate-400" />
+            Exportar CSV
+          </button>
+        </div>
       </div>
 
       {/* Barra de Filtros */}
@@ -160,7 +208,11 @@ export const AlertsTable: React.FC<AlertsTableProps> = ({
                 <td colSpan={7} className="py-8 text-center text-slate-500">
                   <div className="flex flex-col items-center justify-center gap-1.5">
                     <AlertCircle className="w-5 h-5 text-slate-600" />
-                    <span>No se encontraron alertas con los filtros aplicados.</span>
+                    <span className="text-xs">
+                      {scope === 'session'
+                        ? 'Sesión limpia: No se han registrado incidentes en esta sesión de monitoreo en vivo.'
+                        : 'No se encontraron alertas con los filtros aplicados en la base de datos.'}
+                    </span>
                   </div>
                 </td>
               </tr>
